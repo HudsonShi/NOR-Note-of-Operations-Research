@@ -309,7 +309,7 @@
   \end{block}
 
   \begin{block}{二阶必要条件}
-    若 $\bm{x}^*$ 是局部极小点且 $f$ 二阶可微，则 $\nabla f(\bm{x}^*) = \bm{0}$ 且 $\nabla^2 f(\bm{x}^*) \succeq \bm{0}$（半正定）。
+    若 $\bm{x}^*$ 是局部极小点且 $f$ 二阶可微，则 $\nabla f(\bm{x}^*) = \bm{0}$ 且 $\nabla^2 f(\bm{x}^*) \succcurlyeq \bm{0}$（半正定）。
   \end{block}
 
   \begin{block}{二阶充分条件}
@@ -663,7 +663,7 @@
   \textbf{判别条件}：
   \begin{itemize}
     \item 一阶条件（可微时）：$f(\bm{y}) \geq f(\bm{x}) + \nabla f(\bm{x})^\top (\bm{y}-\bm{x})$
-    \item 二阶条件（二阶可微时）：$\nabla^2 f(\bm{x}) \succeq \bm{0}$（Hessian 半正定）
+    \item 二阶条件（二阶可微时）：$\nabla^2 f(\bm{x}) \succcurlyeq \bm{0}$（Hessian 半正定）
     \item 上镜图 (Epigraph)：$\epi(f) = \{(\bm{x}, t) \mid f(\bm{x}) \leq t\}$ 是凸集 $\Longleftrightarrow$ $f$ 是凸函数
   \end{itemize}
 
@@ -798,7 +798,7 @@
   \begin{align*}
     \min_{\bm{X}} \quad & \langle \bm{C}, \bm{X} \rangle = \tr(\bm{C}^\top \bm{X}) \\
     \text{s.t.} \quad   & \langle \bm{A}_i, \bm{X} \rangle = b_i,\quad i=1,\dots,m \\
-                        & \bm{X} \succeq \bm{0} \quad (\text{半正定约束})
+                        & \bm{X} \succcurlyeq \bm{0} \quad (\text{半正定约束})
   \end{align*}
 
   \begin{itemize}
