@@ -1091,6 +1091,207 @@
   \end{itemize}
 \end{frame}
 
+% ############################################################
+% PART 5: GPU/CUDA 并行计算与 ML 优化加速
+% ############################################################
+\section{GPU / CUDA 并行计算与 ML 优化加速}
+
+\begin{frame}{为什么 GPU 对优化算法至关重要？}
+  现代 ML 优化的核心计算是\textbf{大规模矩阵运算}和\textbf{梯度计算}——天然适合 GPU 的 SIMT 架构。
+
+  \vspace{6pt}
+  \begin{columns}[T]
+    \column{0.48\textwidth}
+    \textbf{CPU (少核大算力)}：
+    \begin{itemize}
+      \item 8--64 个复杂核心
+      \item 擅长分支、串行逻辑
+      \item 大缓存、乱序执行
+    \end{itemize}
+    \column{0.48\textwidth}
+    \textbf{GPU (多核轻量)}：
+    \begin{itemize}
+      \item 数千个简单核心
+      \item 擅长数据并行 (SIMT)
+      \item 高内存带宽 ($\sim$2 TB/s)
+    \end{itemize}
+  \end{columns}
+
+  \vspace{8pt}
+  \begin{block}{NVIDIA CUDA 编程模型}
+    \begin{itemize}
+      \item Thread → Warp (32 threads) → Block → Grid
+      \item 内存层次：Global → L2 → Shared Memory → Registers
+      \item Tensor Cores (Volta+)：单周期 $4\times4$ 矩阵乘加
+    \end{itemize}
+  \end{block}
+
+  \textcolor{blue}{A100 80GB: 6912 CUDA cores + 432 Tensor Cores, 312 TFLOPS (FP16)}
+\end{frame}
+
+\begin{frame}{GPU 上的优化算法：一阶方法的天然优势}
+  梯度下降族算法 (SGD, Adam, AdamW) 的每次迭代：
+  \begin{enumerate}
+    \item Forward pass：矩阵乘法 $\bm{y} = \bm{Wx}$
+    \item Loss 计算：标量，计算量小
+    \item Backward pass：矩阵乘法 $\nabla_W \mathcal{L} = (\nabla_y \mathcal{L}) \bm{x}^\top$
+    \item 参数更新：逐元素操作
+  \end{enumerate}
+
+  \vspace{6pt}
+  \textbf{关键观察}：第 1、3 步是密集矩阵乘法，GPU 加速 $50\times$--$200\times$。
+
+  \begin{itemize}
+    \item cuBLAS：高度优化的 GEMM (通用矩阵乘)
+    \item cuDNN：卷积、池化、归一化的 GPU kernel
+    \item 二阶方法 (Newton, K-FAC) 的 Hessian 构造在 GPU 上仍昂贵
+  \end{itemize}
+
+  \begin{alertblock}{GPU 瓶颈}
+    不是计算，是\textbf{显存带宽}和\textbf{通信}。一个 175B 模型需要 $\sim$350 GB 仅存参数 (FP16)，加上优化器状态轻松破 TB。
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}{混合精度训练 (Mixed Precision)}
+  \textbf{动机}：FP32 精度在很多梯度更新中冗余，FP16 可翻倍吞吐、减半显存。
+
+  \vspace{4pt}
+  \textbf{标准混合精度流程 (NVIDIA APEX / PyTorch AMP)}：
+  \begin{enumerate}
+    \item 权重以 FP32 主副本存储
+    \item Forward/Backward 用 FP16 计算（速度 $2\times$）
+    \item \textbf{Loss Scaling}：梯度太小时乘以常数 $S$ 防止 underflow
+    \item 梯度回转为 FP32，更新主副本权重
+  \end{enumerate}
+
+  \begin{block}{BF16 (Brain Float 16)}
+    \begin{itemize}
+      \item 与 FP32 相同指数位 (8 bit)，仅尾数截断 (7 bit)
+      \item 动态范围 = FP32，无需 loss scaling
+      \item NVIDIA A100 / H100 原生支持，训练更稳定
+    \end{itemize}
+  \end{block}
+
+  Tensor Cores 在 FP16/BF16 下吞吐可达 FP32 的 8--16$\times$。
+\end{frame}
+
+\begin{frame}{梯度累积 \& 大批量训练}
+  GPU 显存限制单次能处理的 batch size，但大批量训练有助于收敛稳定性和扩展性。
+
+  \vspace{6pt}
+  \textbf{梯度累积 (Gradient Accumulation)}：
+  \begin{itemize}
+    \item 执行 $k$ 次 micro-batch 前向+反向，梯度累加但不更新
+    \item 第 $k$ 次后统一更新，等价于 batch size $\times k$
+    \item 显存需求 = micro-batch size，训练时间 $\approx$ 不变（梯度同步开销略增）
+  \end{itemize}
+
+  \vspace{4pt}
+  \textbf{大批量训练的挑战}：
+  \begin{itemize}
+    \item 线性缩放规则 (Linear Scaling Rule, Goyal et al. 2017)：\\
+      $\eta_{\text{new}} = \eta_{\text{base}} \times (B_{\text{new}} / B_{\text{base}})$，需配合 warmup
+    \item LARS (Layer-wise Adaptive Rate Scaling)：逐层自适应学习率
+    \item LAMB：Adam 的大批量变体，BERT 预训练标配
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{分布式 GPU 训练架构}
+  \begin{columns}[T]
+    \column{0.55\textwidth}
+    \textbf{数据并行 (Data Parallel)}：
+    \begin{itemize}
+      \item 每 GPU 持有完整模型
+      \item 各 GPU 吃不同 mini-batch
+      \item All-Reduce 求梯度平均
+      \item PyTorch DDP, Horovod
+    \end{itemize}
+
+    \vspace{4pt}
+    \textbf{模型并行}：
+    \begin{itemize}
+      \item Tensor Parallel (Megatron-LM)
+      \item Pipeline Parallel (GPipe)
+      \item 3D Parallel = DP + TP + PP
+    \end{itemize}
+    \column{0.45\textwidth}
+    \textbf{NCCL 通信原语}：
+    \begin{itemize}
+      \item All-Reduce：梯度平均
+      \item All-Gather：收集分片
+      \item Reduce-Scatter：分片归约
+      \item 带宽：$\sim$600 GB/s (NVLink)
+    \end{itemize}
+
+    \vspace{4pt}
+    \textbf{FSDP (Fully Sharded DP)}：\\
+    参数+梯度+优化器全分片，ZeRO-3 的 PyTorch 原生实现。
+  \end{columns}
+\end{frame}
+
+\begin{frame}{显存优化策略}
+  训练大模型的显存构成（以 1B 参数 + Adam + FP16 为例）：
+
+  \begin{table}
+    \small
+    \begin{tabular}{l|r|r}
+      \toprule
+      组成部分 & 估算大小 & 比例 \\
+      \midrule
+      模型参数 (FP16) & 2 GB & $\sim$20\% \\
+      Adam $m$ (FP32) & 4 GB & $\sim$40\% \\
+      Adam $v$ (FP32) & 4 GB & $\sim$40\% \\
+      梯度 (FP16) & 2 GB & $\sim$20\% \\
+      激活值 (Activations) & 可变 & 额外 \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+
+  \vspace{4pt}
+  \textbf{核心优化技术}：
+  \begin{itemize}
+    \item \textbf{Gradient Checkpointing}：不存中间激活，反向时重新计算（显存 $\searrow$、计算 $\nearrow$）
+    \item \textbf{Activation Offloading}：激活值溢出到 CPU 内存
+    \item \textbf{FlashAttention}：IO-aware 精确注意力，分块计算 + 在线 softmax，显存从 $\mathcal{O}(N^2)$ 降到 $\mathcal{O}(N)$
+    \item \textbf{Kernel Fusion}：融合多个 CUDA kernel 减少访存（如 Bias + GeLU + Dropout）
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{GPU 优化实战 Checklist}
+  \begin{enumerate}
+    \item \textbf{混合精度}：启用 AMP (FP16) 或 BF16，确认 Tensor Core 利用率
+    \item \textbf{数据加载}：多进程 DataLoader，prefetch，pin\_memory
+    \item \textbf{梯度累积}：用小 batch + 累积模拟大 batch
+    \item \textbf{分布式}：单机多卡用 DDP，多机用 FSDP / DeepSpeed
+    \item \textbf{编译优化}：torch.compile / TensorRT，XLA，kernel fusion
+    \item \textbf{显存管理}：gradient checkpointing，FlashAttention，fused optimizer
+    \item \textbf{监控工具}：nvidia-smi, Nsight Systems (timeline), Nsight Compute (kernel)
+    \item \textbf{batch size 调优}：找到 GPU 利用率拐点 (通常 $> 80\%$ 为佳)
+  \end{enumerate}
+
+  \vspace{6pt}
+  \begin{center}
+    \textcolor{blue}{\textbf{核心原则：减少 GPU 空闲等待 —— 要么在算，要么在传数据，不要闲下来。}}
+  \end{center}
+\end{frame}
+
+\begin{frame}{GPU 加速的运筹优化应用}
+  \begin{itemize}
+    \item \textbf{大规模 LP 求解}：GPU 加速内点法的线性系统求解（cuSOLVER）
+    \item \textbf{分支定界并行}：MIP 的 B\&B 树在 GPU 上并行展开
+    \item \textbf{组合优化的神经求解器}：Transformer/GNN 在 GPU 上做 TSP/VRP 端到端推理
+    \item \textbf{蒙特卡洛仿真}：GPU 加速随机优化（如随机规划的场景生成与求解）
+    \item \textbf{RL for OR}：GPU 并行仿真环境，PPO 训练调度/路径策略
+    \item \textbf{SDP 求解}：GPU 加速 SDP 内点法中的 Cholesky 分解和矩阵乘法
+  \end{itemize}
+
+  \vspace{8pt}
+  \begin{block}{趋势}
+    NVIDIA cuOpt：专为运筹优化设计的 GPU 加速库，支持 VRP、调度等问题，速度可达传统求解器的 $100\times$。
+  \end{block}
+\end{frame}
+
+
 \begin{frame}{总结}
   \begin{enumerate}
     \item \textbf{线性规划}是优化理论的基石，单纯形法与内点法互补
@@ -1099,6 +1300,7 @@
     \item \textbf{ML 中的优化}：SGD → Momentum → Adam，一阶方法主导
     \item \textbf{LLM 中的优化}：分布式训练（ZeRO）、PEFT（LoRA）、量化、RLHF
     \item \textbf{交叉前沿}：ML 与 OR 双向赋能，端到端优化决策
+    \item \textbf{GPU 加速}：CUDA、混合精度、分布式训练、FlashAttention、cuOpt
   \end{enumerate}
 
   \vspace{12pt}

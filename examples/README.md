@@ -12,3 +12,13 @@
 
 - **Gurobi 例**：需安装 `gurobipy` 并配置 license
 - **纯 Python 例**：无外部依赖，Python 3.8+ 即可运行
+
+## GPU / CUDA 并行计算
+
+| 文件 | 依赖 | 内容 |
+|---|---|---|
+| `cuda_saxpy.py` | numba | CUDA 入门：SAXPY kernel，线程网格模型 |
+| `gpu_matmul.py` | PyTorch | CPU vs GPU 矩阵乘法吞吐对比 |
+| `pytorch_gpu_benchmark.py` | PyTorch, torchvision | CNN CIFAR-10：FP32 / AMP / torch.compile 吞吐测试 |
+| `gradient_accumulation.py` | PyTorch | 梯度累积实现 + 与大批量训练的等价性验证 |
+| `mixed_precision_training.py` | PyTorch | AMP 混合精度训练：FP32 vs FP16 速度/内存对比 |
