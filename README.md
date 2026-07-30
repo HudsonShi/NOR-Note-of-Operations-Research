@@ -32,3 +32,15 @@ xelatex optimization_beamer.tex   # 运行两遍以稳定目录和交叉引用
 ## 许可
 
 MIT License
+
+## 代码示例 (`examples/`)
+
+| 文件 | 类型 | 内容 |
+|---|---|---|
+| `lp_production.py` | Gurobi LP | 生产计划：原始 + 对偶，含影子价格与强对偶验证 |
+| `mip_facility_location.py` | Gurobi MIP | 设施选址：固定成本 + 运输成本 |
+| `tsp_mtz.py` | Gurobi MIP | TSP：Miller–Tucker–Zemlin 子环消除公式 |
+| `simulated_annealing_tsp.py` | 纯 Python | 模拟退火解 TSP：Metropolis 准则 + 2-opt |
+| `genetic_algorithm.py` | 纯 Python | 遗传算法：Rastrigin，锦标赛选择 + BLX-α + 高斯变异 |
+
+详见 [examples/README.md](examples/README.md)。
