@@ -1,0 +1,918 @@
+% ============================================================
+% 运筹学优化算法 — Beamer 课件
+% Topics: 线性规划 · 非线性规划 · 凸优化 · ML / LLM 应用
+% Compile: xelatex optimization_beamer.tex
+% ============================================================
+\documentclass[11pt, aspectratio=169, svgnames, table]{ctexbeamer}
+
+% ---------- Packages ----------
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{mathrsfs}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc, shapes.geometric}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{graphicx}
+
+% Make Beamer structural elements use PingFang SC (CJK-compatible)
+
+% ---------- Theme ----------
+\usetheme{Madrid}
+\useinnertheme{rectangles}
+\usecolortheme{seahorse}
+\setbeamertemplate{frametitle continuation}{}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\setbeamertemplate{headline}{}
+
+% ---------- Custom ----------
+\setbeamercolor{alerted text}{fg=red!70!black}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\argmin}{\operatorname*{arg\,min}}
+\newcommand{\argmax}{\operatorname*{arg\,max}}
+\newcommand{\diag}{\operatorname{diag}}
+\newcommand{\tr}{\operatorname{tr}}
+\newcommand{\prox}{\operatorname{prox}}
+\newcommand{\dom}{\operatorname{dom}}
+\newcommand{\epi}{\operatorname{epi}}
+
+% ---------- Title ----------
+\title{\textbf{运筹学优化算法}}
+\subtitle{线性规划 · 非线性规划 · 凸优化 · 机器学习与大模型应用}
+\author{运筹学课件}
+\institute{Operations Research \& Optimization}
+\date{\today}
+
+\begin{document}
+
+% ============================================================
+% TITLE SLIDE
+% ============================================================
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% ============================================================
+% OUTLINE
+% ============================================================
+\begin{frame}{目录}
+  \tableofcontents[hideallsubsections]
+\end{frame}
+
+% ############################################################
+% PART 1: 线性规划
+% ############################################################
+\section{线性规划 (Linear Programming)}
+
+\subsection{LP 基本概念与标准形}
+
+\begin{frame}{线性规划简介}
+  \textbf{线性规划 (LP)}是运筹学中最基础也是最重要的优化模型。
+  \begin{itemize}
+    \item 目标函数是决策变量的线性函数
+    \item 约束条件是一组线性等式/不等式
+    \item 决策变量可以取连续值（早期经典 LP 中为非负）
+  \end{itemize}
+
+  \vspace{6pt}
+  \textbf{标准形 (Standard Form)}：
+  \begin{align*}
+    \min_{\bm{x}} \quad & \bm{c}^\top \bm{x} \\
+    \text{s.t.} \quad  & \bm{A} \bm{x} = \bm{b} \\
+                       & \bm{x} \geq \bm{0}
+  \end{align*}
+  其中 $\bm{A} \in \R^{m \times n}$，$\bm{b} \in \R^m$，$\bm{c} \in \R^n$。
+\end{frame}
+
+\begin{frame}{LP 的几何意义}
+  \begin{itemize}
+    \item 可行域是\textbf{多面体 (Polyhedron)}：$\{\bm{x} \mid \bm{Ax} = \bm{b},\ \bm{x} \geq \bm{0}\}$
+    \item 若可行域非空且有界，则为凸多胞形 (Convex Polytope)
+    \item \textbf{最优解必在顶点 (extreme point / basic feasible solution) 处取得}
+    \item 单纯形法 (Simplex Method) 正是沿着顶点间迭代
+  \end{itemize}
+  \vspace{10pt}
+  \begin{center}
+    \begin{tikzpicture}[scale=0.75]
+      \draw[->] (-0.5,0) -- (5.5,0) node[right] {$x_1$};
+      \draw[->] (0,-0.5) -- (0,4.5) node[above] {$x_2$};
+      \filldraw[blue!15, draw=blue!50] (0,0) -- (4,0) -- (3,3) -- (0,3) -- cycle;
+      \draw[->, red, thick] (0.2,0.2) -- (1.5,2.5);
+      \node[red] at (1.8,2.8) {$\bm{c}$};
+      \node at (1.5,1.5) {可行域};
+      \node[circle, fill=red, inner sep=2pt] at (3,3) {};
+      \node[above] at (3,3) {最优解};
+    \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+\begin{frame}{LP 的变形}
+  任何 LP 都可以转化为标准形：
+  \begin{itemize}
+    \item $\max \bm{c}^\top \bm{x} \;\Longleftrightarrow\; \min -\bm{c}^\top \bm{x}$
+    \item $\bm{Ax} \leq \bm{b} \;\Longleftrightarrow\; \bm{Ax} + \bm{s} = \bm{b},\ \bm{s} \geq \bm{0}$（松弛变量）
+    \item $\bm{Ax} \geq \bm{b} \;\Longleftrightarrow\; \bm{Ax} - \bm{s} = \bm{b},\ \bm{s} \geq \bm{0}$（剩余变量）
+    \item $x_i$ 无约束 $\;\Longleftrightarrow\; x_i = x_i^+ - x_i^-,\ x_i^+, x_i^- \geq 0$
+  \end{itemize}
+  \vspace{8pt}
+  \begin{alertblock}{重要性质}
+    LP 可在多项式时间内求解（椭球法 / 内点法），但 Simplex 法在实践中仍然极其高效。
+  \end{alertblock}
+\end{frame}
+
+\subsection{单纯形法 (Simplex Method)}
+
+\begin{frame}{单纯形法基本思路}
+  \textbf{基本可行解 (Basic Feasible Solution, BFS)}：$\bm{A}$ 的列中选 $m$ 个线性无关列构成基矩阵 $\bm{B}$，令非基变量为 0，解 $\bm{Bx}_B = \bm{b}$。
+
+  \vspace{8pt}
+  \textbf{单纯形法迭代步骤}：
+  \begin{enumerate}
+    \item 从一个初始 BFS 出发
+    \item 计算简约代价 (reduced cost)：$\bar{\bm{c}}_N^\top = \bm{c}_N^\top - \bm{c}_B^\top \bm{B}^{-1}\bm{N}$
+    \item 若 $\bar{\bm{c}}_N \geq \bm{0}$（极小化问题），当前解最优
+    \item 否则选入基变量（Dantzig 规则：选最负），出基变量经最小比值 (ratio test) 确定
+    \item 更新基矩阵，进入下一轮迭代
+  \end{enumerate}
+  几何上等价于沿着多面体的棱在顶点间移动。
+\end{frame}
+
+\begin{frame}{单纯形表 (Simplex Tableau)}
+  标准形 LP 的初始单纯形表：
+  \begin{center}
+    \begin{tabular}{c|cc|c}
+      \toprule
+      基变量 & $\bm{x}_B$ & $\bm{x}_N$ & RHS \\
+      \midrule
+      $\bm{x}_B$ & $\bm{I}$ & $\bm{B}^{-1}\bm{N}$ & $\bm{B}^{-1}\bm{b}$ \\
+      \midrule
+      $z$ & $\bm{0}$ & $\bar{\bm{c}}_N^\top$ & $\bm{c}_B^\top \bm{B}^{-1}\bm{b}$ \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \begin{itemize}
+    \item $\bar{\bm{c}}_N \geq \bm{0}$ 时达到最优
+    \item 若有 $\bar{c}_j < 0$ 且对应列 $\leq \bm{0}$，则问题无界
+    \item Min ratio test 保证可行性
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{两阶段法 (Two-Phase Method)}
+  初始 BFS 通常不易直接获得。\textbf{两阶段法}通过引入人工变量解决：
+  \begin{itemize}
+    \item \textbf{Phase I}：引入人工变量 $\bm{a}$，求解辅助问题
+      \begin{equation*}
+        \min \sum_{i} a_i \quad \text{s.t.} \quad \bm{Ax} + \bm{a} = \bm{b},\ \bm{x}, \bm{a} \geq \bm{0}
+      \end{equation*}
+      若最优值 $>0$，原问题无可行解
+    \item \textbf{Phase II}：以 Phase I 的最优 BFS 为起点，求解原问题
+    \item 大 M 法是其近似替代（在目标函数中加入惩罚项 $M\sum a_i$）
+  \end{itemize}
+\end{frame}
+
+\subsection{对偶理论 (Duality Theory)}
+
+\begin{frame}{对偶理论：构造对偶问题}
+  原始问题 (Primal)：
+  \begin{equation*}
+    \min_{\bm{x}} \;\bm{c}^\top \bm{x} \quad \text{s.t.} \quad \bm{Ax} = \bm{b},\ \bm{x} \geq \bm{0}
+  \end{equation*}
+
+  \vspace{6pt}
+  对偶问题 (Dual)：
+  \begin{equation*}
+    \max_{\bm{y}} \;\bm{b}^\top \bm{y} \quad \text{s.t.} \quad \bm{A}^\top \bm{y} \leq \bm{c}
+  \end{equation*}
+
+  \vspace{8pt}
+  \begin{table}
+    \small
+    \begin{tabular}{c|c}
+      \toprule
+      Primal (极小化) & Dual (极大化) \\
+      \midrule
+      变量 $x_i \geq 0$ & $\bm{a}_i^\top \bm{y} \leq c_i$ \\
+      变量 $x_i$ 无约束 & $\bm{a}_i^\top \bm{y} = c_i$ \\
+      $\bm{a}_i^\top \bm{x} \geq b_i$ & 变量 $y_i \geq 0$ \\
+      $\bm{a}_i^\top \bm{x} = b_i$ & 变量 $y_i$ 无约束 \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+\end{frame}
+
+\begin{frame}{弱对偶与强对偶}
+  \begin{block}{弱对偶定理 (Weak Duality)}
+    对于任意可行 $\bm{x}$（Primal）和 $\bm{y}$（Dual），有：
+    \begin{equation*}
+      \bm{c}^\top \bm{x} \geq \bm{b}^\top \bm{y}
+    \end{equation*}
+    对偶问题最优值给出原始问题最优值的下界。
+  \end{block}
+
+  \begin{block}{强对偶定理 (Strong Duality)}
+    若 Primal 有有限最优解，则 Dual 也有最优解，且：
+    \begin{equation*}
+      \min \bm{c}^\top \bm{x} = \max \bm{b}^\top \bm{y}
+    \end{equation*}
+  \end{block}
+
+  \begin{alertblock}{互补松弛条件 (Complementary Slackness)}
+    $x_i^* \cdot (\bm{a}_i^\top \bm{y}^* - c_i) = 0$ 对所有 $i$；\\[2pt]
+    $y_i^* \cdot (\bm{a}_i^\top \bm{x}^* - b_i) = 0$ 对所有 $i$。
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}{对偶理论的经济解释：影子价格}
+  \begin{itemize}
+    \item 对偶变量 $\bm{y}$ 也称\textbf{影子价格 (Shadow Price)}
+    \item $y_i$ = 第 $i$ 个约束右端项 $b_i$ 每增加 1 单位，最优目标值的边际改善
+    \item 影子价格为 0 的约束是非紧的（有松弛）
+    \item 影子价格 $>0$ 的约束是紧的（资源稀缺）
+  \end{itemize}
+
+  \vspace{8pt}
+  \textbf{灵敏度分析 (Sensitivity Analysis)} 即利用对偶信息，判断 $b_i$ 或 $c_j$ 在什么范围内波动后当前基仍然最优。
+
+  \begin{itemize}
+    \item 右端项范围：$\bm{B}^{-1}\bm{b} \geq \bm{0}$ 的范围
+    \item 目标系数范围：$\bar{\bm{c}}_N \geq \bm{0}$ 的范围
+  \end{itemize}
+\end{frame}
+
+\subsection{内点法 (Interior Point Methods)}
+
+\begin{frame}{线性规划的内点法}
+  LP 也可以用\textbf{内点法 (Interior Point Method)}求解，在可行域内部迭代，多项式时间保证。
+
+  \vspace{6pt}
+  \textbf{原始-对偶路径跟踪法}：解 KKT 系统的扰动形式
+  \begin{align*}
+    \bm{Ax} &= \bm{b}, \quad \bm{x} > \bm{0} \\
+    \bm{A}^\top \bm{y} + \bm{s} &= \bm{c}, \quad \bm{s} > \bm{0} \\
+    \bm{X} \bm{S} \bm{e} &= \mu \bm{e}
+  \end{align*}
+  其中 $\bm{X} = \diag(\bm{x}),\ \bm{S} = \diag(\bm{s})$，$\mu \to 0$。
+
+  \vspace{6pt}
+  用 Newton 法求解该系统，逐步降低 $\mu$。实践中对大规模稀疏 LP 效果极好。
+\end{frame}
+
+\begin{frame}{LP 应用举例}
+  \begin{itemize}
+    \item \textbf{生产计划}：多产品多资源在约束下最大化利润
+    \item \textbf{运输问题}：$m$ 个产地、$n$ 个销地的最小成本运输方案
+    \item \textbf{分配问题}：Hungarian 算法求解 $n$ 对 $n$ 的最优匹配
+    \item \textbf{网络流问题}：最大流 / 最小费用流 → 特殊 LP 结构
+    \item \textbf{投资组合}：线性约束下的资产配置
+    \item \textbf{数据包络分析 (DEA)}：效率评价
+  \end{itemize}
+  \vspace{6pt}
+  \begin{center}
+    \textcolor{blue}{大规模 LP 求解器：Gurobi, CPLEX, HiGHS, GLPK}
+  \end{center}
+\end{frame}
+
+% ############################################################
+% PART 2: 非线性规划
+% ############################################################
+\section{非线性规划 (Nonlinear Programming)}
+
+\subsection{NLP 基础概念}
+
+\begin{frame}{非线性规划简介}
+  NLP 的标准形式：
+  \begin{align*}
+    \min_{\bm{x}} \quad & f(\bm{x}) \\
+    \text{s.t.} \quad   & g_i(\bm{x}) \leq 0,\quad i = 1,\dots,m \\
+                        & h_j(\bm{x}) = 0,\quad j = 1,\dots,p
+  \end{align*}
+  其中 $f, g_i, h_j$ 至少有一个是非线性的。
+
+  \vspace{8pt}
+  \begin{itemize}
+    \item \textbf{无约束 NLP}：只需 $\min f(\bm{x})$
+    \item \textbf{约束 NLP}：需要处理等式和不等式约束
+    \item 解可能非全局最优 → 需要全局优化技术
+  \end{itemize}
+\end{frame}
+
+\subsection{无约束优化}
+
+\begin{frame}{无约束最优性条件}
+  对于 $\min f(\bm{x}),\ \bm{x} \in \R^n$：
+
+  \begin{block}{一阶必要条件}
+    若 $\bm{x}^*$ 是局部极小点且 $f$ 可微，则 $\nabla f(\bm{x}^*) = \bm{0}$。
+  \end{block}
+
+  \begin{block}{二阶必要条件}
+    若 $\bm{x}^*$ 是局部极小点且 $f$ 二阶可微，则 $\nabla f(\bm{x}^*) = \bm{0}$ 且 $\nabla^2 f(\bm{x}^*) \succeq \bm{0}$（半正定）。
+  \end{block}
+
+  \begin{block}{二阶充分条件}
+    若 $\nabla f(\bm{x}^*) = \bm{0}$ 且 $\nabla^2 f(\bm{x}^*) \succ \bm{0}$（严格正定），则 $\bm{x}^*$ 是严格局部极小点。
+  \end{block}
+\end{frame}
+
+\begin{frame}{梯度下降法 (Gradient Descent)}
+  迭代形式：
+  \begin{equation*}
+    \bm{x}_{k+1} = \bm{x}_k - \alpha_k \nabla f(\bm{x}_k)
+  \end{equation*}
+
+  \begin{itemize}
+    \item $\alpha_k$：步长 (step size / learning rate)
+    \item 收敛速度：线性收敛（对一般凸函数），$\mathcal{O}(1/k)$ 次梯度收敛
+    \item \textbf{Wolfe 条件}确保充分下降和曲率
+    \item \textbf{Backtracking line search} 是常用的步长选择策略
+  \end{itemize}
+
+  \vspace{6pt}
+  \textcolor{red}{缺点}：收敛慢，对 ill-conditioned 问题表现差，需精细调整步长。
+\end{frame}
+
+\begin{frame}{牛顿法 (Newton's Method)}
+  利用二阶 Taylor 展开：
+  \begin{equation*}
+    f(\bm{x}_k + \bm{p}) \approx f(\bm{x}_k) + \nabla f(\bm{x}_k)^\top \bm{p} + \frac12 \bm{p}^\top \nabla^2 f(\bm{x}_k) \bm{p}
+  \end{equation*}
+
+  Newton 方向：$\bm{p}_k = -[\nabla^2 f(\bm{x}_k)]^{-1} \nabla f(\bm{x}_k)$
+  \begin{equation*}
+    \bm{x}_{k+1} = \bm{x}_k + \alpha_k \bm{p}_k
+  \end{equation*}
+
+  \begin{itemize}
+    \item 二次终止性：对严格凸二次函数一步到最优
+    \item 局部二次收敛（极快）
+    \item \textcolor{red}{缺点}：每次迭代需计算和分解 Hessian（$\mathcal{O}(n^3)$），Hessian 可能非正定
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{拟牛顿法 (Quasi-Newton Methods)}
+  避免计算 Hessian，用梯度信息近似 Hessian 逆。
+
+  \vspace{6pt}
+  \textbf{BFGS (Broyden–Fletcher–Goldfarb–Shanno)}：
+  \begin{align*}
+    s_k &= \bm{x}_{k+1} - \bm{x}_k \\
+    y_k &= \nabla f(\bm{x}_{k+1}) - \nabla f(\bm{x}_k) \\
+    \bm{H}_{k+1} &= \left(\bm{I} - \rho_k s_k y_k^\top\right) \bm{H}_k \left(\bm{I} - \rho_k y_k s_k^\top\right) + \rho_k s_k s_k^\top
+  \end{align*}
+  其中 $\rho_k = 1 / (y_k^\top s_k)$。
+
+  \begin{itemize}
+    \item 超线性收敛
+    \item \textbf{L-BFGS}：仅存储最近 $m$ 对 $(s_k, y_k)$，内存 $\mathcal{O}(mn)$，适合大规模问题
+  \end{itemize}
+\end{frame}
+
+\subsection{约束优化与 KKT 条件}
+
+\begin{frame}{Karush–Kuhn–Tucker (KKT) 条件}
+  NLP 的一阶必要条件——KKT 条件：
+  \begin{align*}
+    \nabla f(\bm{x}^*) + \sum_{i=1}^m \mu_i \nabla g_i(\bm{x}^*) + \sum_{j=1}^p \lambda_j \nabla h_j(\bm{x}^*) &= \bm{0} \\
+    g_i(\bm{x}^*) &\leq 0,\quad i=1,\dots,m \\
+    h_j(\bm{x}^*) &= 0,\quad j=1,\dots,p \\
+    \mu_i &\geq 0,\quad i=1,\dots,m \\
+    \mu_i \cdot g_i(\bm{x}^*) &= 0,\quad i=1,\dots,m \quad \text{(互补松弛)}
+  \end{align*}
+
+  \begin{itemize}
+    \item $\mu_i$：不等式约束的 Lagrange 乘子
+    \item $\lambda_j$：等式约束的 Lagrange 乘子
+    \item 在凸规划中，KKT 条件既是必要也是充分的
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{约束优化的数值方法}
+  \begin{itemize}
+    \item \textbf{罚函数法 (Penalty Method)}：将约束惩罚加入目标
+      \begin{equation*}
+        \min_{\bm{x}} f(\bm{x}) + \rho \left[\sum_i \max(0, g_i(\bm{x}))^2 + \sum_j h_j(\bm{x})^2\right]
+      \end{equation*}
+      $\rho \to \infty$ 时收敛，但可能导致 ill-conditioning
+
+    \item \textbf{障碍函数法 (Barrier Method)}：用对数障碍处理不等式约束
+      \begin{equation*}
+        \min_{\bm{x}} f(\bm{x}) - \mu \sum_i \ln(-g_i(\bm{x}))
+      \end{equation*}
+      $\mu \to 0$ 时收敛
+
+    \item \textbf{SQP (Sequential Quadratic Programming)}：每步解一个二次规划 (QP) 子问题
+    \item \textbf{增广 Lagrange 法 (Augmented Lagrangian)}：结合罚函数和对偶思想
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{信赖域方法 (Trust Region Methods)}
+  每步在一个信赖域半径 $\Delta_k$ 内近似目标函数：
+  \begin{equation*}
+    \min_{\|\bm{p}\| \leq \Delta_k} m_k(\bm{p}) = f(\bm{x}_k) + \nabla f(\bm{x}_k)^\top \bm{p} + \frac12 \bm{p}^\top \bm{B}_k \bm{p}
+  \end{equation*}
+
+  \vspace{4pt}
+  根据实际下降与模型预测下降的比率 $\rho_k$ 决定是否接受步及如何调整 $\Delta_k$：
+  \begin{equation*}
+    \rho_k = \frac{f(\bm{x}_k) - f(\bm{x}_k + \bm{p}_k)}{m_k(\bm{0}) - m_k(\bm{p}_k)}
+  \end{equation*}
+
+  \begin{itemize}
+    \item 比线搜索更稳健，能自动调节步长
+    \item 适合非凸和 ill-conditioned 问题
+    \item 在大规模机器学习中也有应用（信赖域 Newton 法）
+  \end{itemize}
+\end{frame}
+
+% ############################################################
+% PART 3: 凸优化
+% ############################################################
+\section{凸优化 (Convex Optimization)}
+
+\subsection{凸集与凸函数}
+
+\begin{frame}{凸集 (Convex Sets)}
+  集合 $C \subseteq \R^n$ 为\textbf{凸集}，若对任意 $\bm{x}, \bm{y} \in C$ 和 $\theta \in [0,1]$：
+  \begin{equation*}
+    \theta \bm{x} + (1-\theta)\bm{y} \in C
+  \end{equation*}
+
+  \vspace{4pt}
+  \begin{columns}[T]
+    \column{0.48\textwidth}
+    \textbf{常见凸集}：
+    \begin{itemize}
+      \item 超平面：$\{\bm{x} \mid \bm{a}^\top \bm{x} = b\}$
+      \item 半空间：$\{\bm{x} \mid \bm{a}^\top \bm{x} \leq b\}$
+      \item 多面体：$\{\bm{x} \mid \bm{Ax} \preceq \bm{b}\}$
+      \item 椭球体
+      \item 范数锥：$\{(\bm{x}, t) \mid \|\bm{x}\| \leq t\}$
+    \end{itemize}
+    \column{0.48\textwidth}
+    \textbf{保凸运算}：
+    \begin{itemize}
+      \item 任意交集 $\bigcap_\alpha C_\alpha$
+      \item 仿射映射 $f(C)$
+      \item 透视函数 / 线性分式函数
+    \end{itemize}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{凸函数 (Convex Functions)}
+  函数 $f: \R^n \to \R$ 为\textbf{凸函数}，若其定义域是凸集且对任意 $\bm{x}, \bm{y}$ 和 $\theta \in [0,1]$：
+  \begin{equation*}
+    f(\theta \bm{x} + (1-\theta)\bm{y}) \leq \theta f(\bm{x}) + (1-\theta) f(\bm{y})
+  \end{equation*}
+
+  \vspace{6pt}
+  \textbf{判别条件}：
+  \begin{itemize}
+    \item 一阶条件（可微时）：$f(\bm{y}) \geq f(\bm{x}) + \nabla f(\bm{x})^\top (\bm{y}-\bm{x})$
+    \item 二阶条件（二阶可微时）：$\nabla^2 f(\bm{x}) \succeq \bm{0}$（Hessian 半正定）
+    \item 上镜图 (Epigraph)：$\epi(f) = \{(\bm{x}, t) \mid f(\bm{x}) \leq t\}$ 是凸集 $\Longleftrightarrow$ $f$ 是凸函数
+  \end{itemize}
+
+  \vspace{4pt}
+  \textbf{强凸函数}：$f(\bm{y}) \geq f(\bm{x}) + \nabla f(\bm{x})^\top (\bm{y}-\bm{x}) + \frac{\mu}{2}\|\bm{y}-\bm{x}\|^2$，$\mu > 0$ 唯一极小点。
+\end{frame}
+
+\begin{frame}{凸优化问题}
+  标准凸优化问题：
+  \begin{align*}
+    \min_{\bm{x}} \quad & f_0(\bm{x}) \\
+    \text{s.t.} \quad   & f_i(\bm{x}) \leq 0,\quad i=1,\dots,m \\
+                        & \bm{Ax} = \bm{b}
+  \end{align*}
+  其中 $f_0, f_1, \dots, f_m$ 均为凸函数。
+
+  \vspace{6pt}
+  \begin{block}{关键性质}
+    任何局部最优解 = 全局最优解。KKT 条件既是必要也是充分的。
+  \end{block}
+
+  \vspace{4pt}
+  \textbf{常见凸优化问题}：
+  \begin{itemize}
+    \item LP, QP (二次规划), QCQP (二次约束二次规划)
+    \item SOCP (二阶锥规划), SDP (半定规划)
+    \item 几何规划 (Geometric Programming)
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{凸对偶理论}
+  Lagrange 对偶函数：
+  \begin{equation*}
+    g(\bm{\lambda}, \bm{\nu}) = \inf_{\bm{x}} \mathcal{L}(\bm{x}, \bm{\lambda}, \bm{\nu})
+  \end{equation*}
+  其中 $\mathcal{L}(\bm{x}, \bm{\lambda}, \bm{\nu}) = f_0(\bm{x}) + \sum_i \lambda_i f_i(\bm{x}) + \sum_j \nu_j (\bm{a}_j^\top \bm{x} - b_j)$。
+
+  \vspace{6pt}
+  \begin{block}{Slater 条件 (Slater's Condition)}
+    若存在严格可行点（所有不等式约束严格成立），则强对偶成立：
+    \begin{equation*}
+      \text{Primal 最优值} = \text{Dual 最优值}
+    \end{equation*}
+  \end{block}
+  对偶问题始终是凹的（极大化），且自动给出原始问题的下界。
+\end{frame}
+
+\subsection{凸优化算法}
+
+\begin{frame}{次梯度方法 (Subgradient Method)}
+  对于不可微的凸函数 $f$：
+  \begin{equation*}
+    \bm{x}_{k+1} = \bm{x}_k - \alpha_k \bm{g}_k,\quad \bm{g}_k \in \partial f(\bm{x}_k)
+  \end{equation*}
+  其中 $\partial f(\bm{x})$ = 次梯度集合。
+
+  \begin{itemize}
+    \item 步长满足 $\alpha_k \to 0,\ \sum \alpha_k = \infty$ 时收敛
+    \item 收敛速度 $\mathcal{O}(1/\sqrt{k})$
+    \item $\ell_1$ 正则化、SVM 等场景常用
+  \end{itemize}
+
+  \vspace{6pt}
+  \begin{alertblock}{注意}
+    次梯度不一定下降方向，需跟踪迄今最佳点（而非最后一步）。
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}{近端梯度法 (Proximal Gradient Method)}
+  目标：$\min f(\bm{x}) + g(\bm{x})$，$f$ 光滑凸，$g$ 可能不可微但 prox 易算。
+
+  \vspace{4pt}
+  \textbf{近端算子 (Proximal Operator)}：
+  \begin{equation*}
+    \prox_{\eta g}(\bm{v}) = \argmin_{\bm{x}} \left\{ g(\bm{x}) + \frac{1}{2\eta}\|\bm{x} - \bm{v}\|^2 \right\}
+  \end{equation*}
+
+  \vspace{4pt}
+  \textbf{ISTA / FISTA}（迭代 / 快速收缩阈值算法）：
+  \begin{align*}
+    \bm{z}_k &= \bm{x}_k - \eta \nabla f(\bm{x}_k) \\
+    \bm{x}_{k+1} &= \prox_{\eta g}(\bm{z}_k)
+  \end{align*}
+
+  \begin{itemize}
+    \item 适用于 $\ell_1$ 正则化 (LASSO)、低秩矩阵恢复等
+    \item FISTA 加速至 $\mathcal{O}(1/k^2)$
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Nesterov 加速梯度 (Accelerated Gradient)}
+  对于光滑凸函数，经典梯度下降 $\mathcal{O}(1/k)$，而 Nesterov 加速可达 $\mathcal{O}(1/k^2)$。
+
+  \vspace{4pt}
+  \textbf{Nesterov 加速梯度 (NAG)}：
+  \begin{align*}
+    \bm{y}_k &= \bm{x}_k + \beta_k(\bm{x}_k - \bm{x}_{k-1}) \\
+    \bm{x}_{k+1} &= \bm{y}_k - \alpha_k \nabla f(\bm{y}_k)
+  \end{align*}
+  其中 $\beta_k = \frac{k-1}{k+2}$（经典方案）。
+
+  \begin{itemize}
+    \item "Look ahead" 策略：不在当前位置求梯度，而在外推位置
+    \item 对强凸函数可达线性收敛速率 $\mathcal{O}\big((1 - \sqrt{\mu/L})^k\big)$
+    \item Nesterov 动量是 SGD with Momentum 和 Adam 的前身
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{ADMM (Alternating Direction Method of Multipliers)}
+  适用于结构分离的凸优化：
+  \begin{align*}
+    \min_{\bm{x}, \bm{z}} \quad & f(\bm{x}) + g(\bm{z}) \\
+    \text{s.t.} \quad           & \bm{Ax} + \bm{Bz} = \bm{c}
+  \end{align*}
+
+  \vspace{4pt}
+  增广 Lagrange：$\mathcal{L}_\rho(\bm{x}, \bm{z}, \bm{y}) = f(\bm{x}) + g(\bm{z}) + \bm{y}^\top(\bm{Ax} + \bm{Bz} - \bm{c}) + \frac{\rho}{2}\|\bm{Ax} + \bm{Bz} - \bm{c}\|^2$
+
+  \vspace{4pt}
+  ADMM 迭代：
+  \begin{align*}
+    \bm{x}_{k+1} &= \argmin_{\bm{x}} \mathcal{L}_\rho(\bm{x}, \bm{z}_k, \bm{y}_k) \\
+    \bm{z}_{k+1} &= \argmin_{\bm{z}} \mathcal{L}_\rho(\bm{x}_{k+1}, \bm{z}, \bm{y}_k) \\
+    \bm{y}_{k+1} &= \bm{y}_k + \rho(\bm{Ax}_{k+1} + \bm{Bz}_{k+1} - \bm{c})
+  \end{align*}
+
+  分布式优化、图像处理、统计学习等领域广泛应用。
+\end{frame}
+
+\begin{frame}{半定规划 (SDP) 简介}
+  SDP 是 LP 向矩阵空间的推广：
+  \begin{align*}
+    \min_{\bm{X}} \quad & \langle \bm{C}, \bm{X} \rangle = \tr(\bm{C}^\top \bm{X}) \\
+    \text{s.t.} \quad   & \langle \bm{A}_i, \bm{X} \rangle = b_i,\quad i=1,\dots,m \\
+                        & \bm{X} \succeq \bm{0} \quad (\text{半正定约束})
+  \end{align*}
+
+  \begin{itemize}
+    \item 内点法 (Primal-Dual IPM) 可在多项式时间内求解
+    \item 应用：矩阵补全、鲁棒 PCA、组合优化的 SDP 松弛
+    \item Max-Cut 的 Goemans–Williamson 0.878 近似比即基于 SDP
+  \end{itemize}
+
+  LP $\subset$ SOCP $\subset$ SDP，逐层增加表达能力。
+\end{frame}
+
+\begin{frame}{凸优化求解器概览}
+  \begin{columns}[T]
+    \column{0.48\textwidth}
+    \textbf{通用求解器}：
+    \begin{itemize}
+      \item CVXPY (Python)
+      \item CVX (MATLAB)
+      \item Convex.jl (Julia)
+    \end{itemize}
+    \column{0.48\textwidth}
+    \textbf{专用求解器}：
+    \begin{itemize}
+      \item ECOS, SCS — SOCP, SDP
+      \item OSQP — QP
+      \item MOSEK — 商业级 LP/QP/SOCP/SDP
+      \item Gurobi / CPLEX — LP, MILP, QP
+    \end{itemize}
+  \end{columns}
+
+  \vspace{8pt}
+  \textbf{建模原则}：
+  \begin{itemize}
+    \item 若能建模为 LP → 用 LP 求解器（最快）
+    \item 若能建模为 QP → 用 QP 求解器
+    \item 若能建模为 SOCP/SDP → 用相应锥规划求解器
+    \item 只有非凸时才考虑通用 NLP 求解器 (IPOPT, SNOPT 等)
+  \end{itemize}
+\end{frame}
+
+% ############################################################
+% PART 4: 运筹优化算法在机器学习和大模型中的应用
+% ############################################################
+\section{运筹优化在 ML 与大模型中的应用}
+
+\subsection{ML 中的优化问题}
+
+\begin{frame}{机器学习 = 优化}
+  机器学习的核心是优化经验风险：
+  \begin{equation*}
+    \min_{\bm{\theta}} \frac{1}{N} \sum_{i=1}^N \ell(\bm{x}_i, y_i;\ \bm{\theta}) + \lambda R(\bm{\theta})
+  \end{equation*}
+
+  \begin{itemize}
+    \item $\ell(\cdot)$：损失函数（交叉熵、MSE、Hinge 等）
+    \item $R(\cdot)$：正则化项（$\ell_2$, $\ell_1$, dropout 等）
+    \item $N$：样本量（现代 ML 中常为百万~十亿级）
+  \end{itemize}
+
+  \vspace{6pt}
+  \textbf{ML 优化的特点}：
+  \begin{itemize}
+    \item $N$ 极大 $\to$ 随机梯度方法
+    \item $n$（参数维度）极大 $\to$ 一阶方法为主
+    \item 非凸但实践中可找到不错的局部极小点
+    \item 对泛化误差的关心 $\gg$ 对训练误差的关心
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{随机梯度下降 (SGD)}
+  每次用一个小批量 (mini-batch) $\mathcal{B}$ 估计梯度：
+  \begin{equation*}
+    \bm{\theta}_{t+1} = \bm{\theta}_t - \eta_t \cdot \frac{1}{|\mathcal{B}|} \sum_{i \in \mathcal{B}} \nabla_\theta \ell(\bm{x}_i, y_i;\ \bm{\theta}_t)
+  \end{equation*}
+
+  \begin{itemize}
+    \item 无偏估计：$\E[\nabla f_{\mathcal{B}}(\bm{\theta})] = \nabla f(\bm{\theta})$
+    \item 收敛速度 $\mathcal{O}(1/\sqrt{T})$（非凸），$\mathcal{O}(1/T)$（强凸）
+    \item 关键技巧：学习率调度、batch size 选择
+  \end{itemize}
+
+  \begin{alertblock}{瓶颈}
+    纯 SGD 收敛慢，对 ill-conditioned 和梯度噪声敏感。
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}{动量法 (Momentum) 与 Nesterov}
+  \textbf{SGD with Momentum (Polyak)}：
+  \begin{align*}
+    \bm{v}_{t} &= \beta \bm{v}_{t-1} + \eta \nabla f(\bm{\theta}_t) \\
+    \bm{\theta}_{t+1} &= \bm{\theta}_t - \bm{v}_t
+  \end{align*}
+
+  \textbf{Nesterov Accelerated Gradient (NAG)}：
+  \begin{align*}
+    \bm{v}_{t} &= \beta \bm{v}_{t-1} + \eta \nabla f(\bm{\theta}_t - \beta \bm{v}_{t-1}) \\
+    \bm{\theta}_{t+1} &= \bm{\theta}_t - \bm{v}_t
+  \end{align*}
+
+  \begin{itemize}
+    \item 动量累积历史梯度方向，加速收敛、减少震荡
+    \item NAG 先根据动量外推，再计算梯度（"Look-ahead"）
+    \item 典型 $\beta = 0.9$
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Adam (Adaptive Moment Estimation)}
+  结合动量与自适应学习率：
+  \begin{align*}
+    \bm{m}_t &= \beta_1 \bm{m}_{t-1} + (1-\beta_1) \bm{g}_t \\
+    \bm{v}_t &= \beta_2 \bm{v}_{t-1} + (1-\beta_2) \bm{g}_t^2 \\
+    \hat{\bm{m}}_t &= \bm{m}_t / (1-\beta_1^t),\quad \hat{\bm{v}}_t = \bm{v}_t / (1-\beta_2^t) \\
+    \bm{\theta}_{t+1} &= \bm{\theta}_t - \eta \cdot \frac{\hat{\bm{m}}_t}{\sqrt{\hat{\bm{v}}_t} + \epsilon}
+  \end{align*}
+
+  \begin{itemize}
+    \item $\hat{\bm{m}}_t$：一阶动量（指数移动平均）
+    \item $\hat{\bm{v}}_t$：二阶动量（RMS 缩放，类似对角的二阶方法近似）
+    \item 默认参数：$\beta_1=0.9$, $\beta_2=0.999$, $\epsilon=10^{-8}$
+    \item 变体：AdamW（解耦 weight decay）、AdaBelief、LAMB
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{学习率调度 (Learning Rate Schedule)}
+  学习率 $\eta$ 对收敛至关重要：
+
+  \begin{itemize}
+    \item \textbf{Step decay}：每隔固定 epoch 乘以衰减因子
+    \item \textbf{Cosine annealing}：
+      \begin{equation*}
+        \eta_t = \eta_{\min} + \frac12(\eta_{\max} - \eta_{\min})\left(1 + \cos\frac{t\pi}{T}\right)
+      \end{equation*}
+    \item \textbf{Warmup}：前几个 epoch 线性增大 $\eta$（Transformer 训练关键）
+    \item \textbf{Cyclic / OneCycle}：周期性调整 LR，加速收敛
+  \end{itemize}
+
+  \vspace{4pt}
+  \begin{block}{Warmup 的必要性}
+    Transformer 训练初期，Warmup 稳定训练、防止梯度爆炸；没有 warmup 时 Adam 在初始阶段方差过大。
+  \end{block}
+\end{frame}
+
+\begin{frame}{二阶方法与深度学习}
+  深度学习主要用一阶方法，但二阶方法有吸引力：
+  \begin{itemize}
+    \item \textbf{Natural Gradient} / \textbf{K-FAC}：用 Fisher 信息矩阵近似 Hessian
+    \item \textbf{Shampoo}：逐层预处理，Google 大规模训练使用
+    \item \textbf{AdaHessian}：用 Hutchinson 方法随机估计 Hessian 对角线
+    \item \textbf{Newton Sketch}：随机投影加速 Newton 法
+  \end{itemize}
+
+  \vspace{6pt}
+  挑战：Hessian 维度 $n \times n$ 太大（数十亿参数 $\to$ 不可能存储），且深度网络 Hessian 谱复杂（负特征值、大条件数）。
+\end{frame}
+
+\subsection{大规模分布式优化}
+
+\begin{frame}{分布式训练中的优化}
+  大模型（> 100B 参数）需要跨数千 GPU 的分布式训练。
+
+  \vspace{4pt}
+  \textbf{数据并行 (Data Parallel)} + \textbf{All-Reduce}：
+  \begin{itemize}
+    \item 每 GPU 持有完整模型副本，处理不同数据 mini-batch
+    \item 求完梯度后 All-Reduce 求平均、更新
+  \end{itemize}
+
+  \vspace{4pt}
+  \textbf{模型并行 (Model Parallel)}：
+  \begin{itemize}
+    \item Tensor Parallelism：矩阵乘法在多个 GPU 上分片
+    \item Pipeline Parallelism：不同层在不同 GPU 上
+  \end{itemize}
+
+  \vspace{4pt}
+  \textbf{关键优化技术}：
+  \begin{itemize}
+    \item \textbf{Gradient Accumulation}：多步累积梯度后更新（模拟大 batch）
+    \item \textbf{混合精度 (FP16/BF16)}：降低通信和计算开销
+    \item \textbf{ZeRO} (Zero Redundancy Optimizer)：分片优化器状态
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{ZeRO 优化器 (DeepSpeed)}
+  Microsoft DeepSpeed 的 ZeRO 将优化器状态分区以节省 GPU 显存：
+
+  \begin{table}
+    \small
+    \begin{tabular}{l|p{5.5cm}|p{5cm}}
+      \toprule
+      阶段 & 分片内容 & 显存节省 \\
+      \midrule
+      ZeRO-1 & 优化器状态 (Adam $m, v$) & 4$\times$ \\
+      ZeRO-2 & 优化器状态 + 梯度 & 8$\times$ \\
+      ZeRO-3 & 优化器状态 + 梯度 + 参数 & 线性随 GPU 数扩展 \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+
+  \vspace{4pt}
+  这使 175B 参数的 GPT-3 级模型可以在数百个 GPU 上训练，而不需要数千个。
+\end{frame}
+
+\subsection{LLM 微调中的优化}
+
+\begin{frame}{LLM 微调：优化视角}
+  全参数微调 (Full Fine-tuning) 对千亿参数模型代价极高：
+  \begin{itemize}
+    \item 需要存储所有参数梯度
+    \item 需要 16-32 倍模型参数量的显存（优化器状态 + 梯度 + 激活值）
+  \end{itemize}
+
+  \vspace{6pt}
+  \textbf{参数高效微调 (PEFT)} 大幅减少可训练参数：
+  \begin{itemize}
+    \item \textbf{LoRA}：低秩矩阵分解，仅训练低秩增量 $\Delta W = BA$
+    \item \textbf{Adapter}：在层间插入小型瓶颈网络
+    \item \textbf{Prefix / Prompt Tuning}：仅优化虚拟 token 嵌入
+  \end{itemize}
+
+  本质上都是\textbf{降维优化}——约束优化在一个低维子流形上进行。
+\end{frame}
+
+\begin{frame}{RLHF 中的优化}
+  RLHF (Reinforcement Learning from Human Feedback) 的优化流程：
+  \begin{enumerate}
+    \item SFT (Supervised Fine-Tuning)：标准监督学习
+    \item 训练 Reward Model：Bradley-Terry 偏好模型
+    \item PPO (Proximal Policy Optimization)：用 Reward Model 优化策略
+      \begin{equation*}
+        \max_\theta \E\left[ r(x,y) - \beta \cdot \text{KL}(\pi_\theta \parallel \pi_{\text{ref}}) \right]
+      \end{equation*}
+  \end{enumerate}
+
+  \vspace{4pt}
+  替代方案：\textbf{DPO (Direct Preference Optimization)}——将 RL 优化转化为一个直接的分类损失，避免了显式的 reward 建模和 PPO 训练。
+
+  \begin{equation*}
+    \mathcal{L}_{\text{DPO}}(\theta) = -\E \left[ \log \sigma \left( \beta \log \frac{\pi_\theta(y_w|x)}{\pi_{\text{ref}}(y_w|x)} - \beta \log \frac{\pi_\theta(y_l|x)}{\pi_{\text{ref}}(y_l|x)} \right) \right]
+  \end{equation*}
+\end{frame}
+
+\begin{frame}{量化与推理优化}
+  大模型推理部署的优化技术：
+
+  \begin{itemize}
+    \item \textbf{权重量化 (GPTQ, AWQ)}：将 FP16 权重压缩到 4-bit 或 8-bit
+      \begin{itemize}
+        \item 基于最优脑外科 (OBS) 的逐层量化
+        \item 目标：$\min_{\hat{W}} \|WX - \hat{W}X\|_F^2$
+      \end{itemize}
+    \item \textbf{KV Cache 优化}：量化缓存的 Key-Value 对
+    \item \textbf{投机解码 (Speculative Decoding)}：用小模型生成候选 token，大模型验证
+    \item \textbf{FlashAttention}：IO-aware 的精确注意力计算
+  \end{itemize}
+
+  \vspace{4pt}
+  这些都是经典的\textbf{近似优化}问题：在精度、速度、内存之间寻找 Pareto 最优。
+\end{frame}
+
+\begin{frame}{大模型训练中的优化挑战}
+  LLM 训练的优化难点：
+  \begin{itemize}
+    \item \textbf{损失尖峰 (Loss Spike)}：训练不稳定，需要回滚和重新开始
+    \item \textbf{数值精度}：FP16/BF16 下的梯度 underflow / overflow
+    \item \textbf{梯度裁剪 (Gradient Clipping)}：$\|\bm{g}\| > \tau$ 时缩放 $\bm{g} \leftarrow \tau \cdot \bm{g} / \|\bm{g}\|$
+    \item \textbf{Z-loss / Logit Regularization}：防止 logit 漂移
+    \item \textbf{嵌入层归一化}：output embedding 的 LayerNorm 稳定训练
+  \end{itemize}
+
+  \vspace{6pt}
+  \textbf{Chinchilla Scaling Law}：在计算预算 $C$ 固定时，模型参数 $N$ 与训练 token 数 $D$ 的最优配置：
+  \begin{equation*}
+    N_{\text{opt}} \propto C^{0.5},\quad D_{\text{opt}} \propto C^{0.5}
+  \end{equation*}
+\end{frame}
+
+\begin{frame}{运筹优化与 ML 的交叉前沿}
+  \begin{itemize}
+    \item \textbf{Decision-Focused Learning}：将 ML 预测嵌入优化模型，端到端训练
+      \begin{itemize}
+        \item 例：预测需求 $\to$ 库存优化，梯度需穿过 LP/IP 层
+      \end{itemize}
+    \item \textbf{Learning to Optimize}：用 RL 学习分支定界启发式、切平面选择等
+    \item \textbf{组合优化的神经求解器}：Pointer Network / Transformer 解 TSP, VRP
+    \item \textbf{混合整数规划 + ML}：用 GNN 加速 MILP 求解
+    \item \textbf{Convex ML}：凸损失 + 凸正则项的模型（如 Elastic Net）
+    \item \textbf{Bilevel Optimization}：元学习、超参数优化、对抗训练
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{总结}
+  \begin{enumerate}
+    \item \textbf{线性规划}是优化理论的基石，单纯形法与内点法互补
+    \item \textbf{非线性规划}：KKT 条件统一处理约束问题，一阶/二阶方法各有适用场景
+    \item \textbf{凸优化}：局部即全局，加速梯度、ADMM、近端方法解决大规模问题
+    \item \textbf{ML 中的优化}：SGD → Momentum → Adam，一阶方法主导
+    \item \textbf{LLM 中的优化}：分布式训练（ZeRO）、PEFT（LoRA）、量化、RLHF
+    \item \textbf{交叉前沿}：ML 与 OR 双向赋能，端到端优化决策
+  \end{enumerate}
+
+  \vspace{12pt}
+  \begin{center}
+    \Large \textbf{谢谢！}
+  \end{center}
+\end{frame}
+
+\end{document}
