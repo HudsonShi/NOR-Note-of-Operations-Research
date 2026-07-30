@@ -20,13 +20,14 @@
 % ---------- Theme ----------
 \usetheme{Madrid}
 \setbeamertemplate{frametitle continuation}{}
-% --- Safe block colors (avoid black-on-black rendering) ---
-\setbeamercolor{block title}{fg=white,bg=blue!60!black}
-\setbeamercolor{block body}{fg=black,bg=blue!5!white}
-\setbeamercolor{block title alerted}{fg=white,bg=red!60!black}
-\setbeamercolor{block body alerted}{fg=black,bg=red!5!white}
-\setbeamercolor{block title example}{fg=white,bg=green!50!black}
-\setbeamercolor{block body example}{fg=black,bg=green!5!white}
+% --- Block colors: light bg + dark text + border (no black rendering risk) ---
+\setbeamercolor{block title}{fg=blue!40!black,bg=blue!10!white}
+\setbeamercolor{block body}{fg=black,bg=blue!3!white}
+\setbeamercolor{block title alerted}{fg=red!40!black,bg=red!10!white}
+\setbeamercolor{block body alerted}{fg=black,bg=red!3!white}
+\setbeamercolor{block title example}{fg=green!40!black,bg=green!10!white}
+\setbeamercolor{block body example}{fg=black,bg=green!3!white}
+\setbeamertemplate{blocks}[default]
 
 \setbeamertemplate{navigation symbols}{}
 \setbeamertemplate{footline}[frame number]
